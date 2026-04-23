@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ESP32 AI Studio</title>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+    background: #0a0f1c;
+    color: #e5e7eb;
+    font-family: "Segoe UI", sans-serif;
+}
+
+/* NAVBAR */
+.navbar {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:15px 25px;
+    background:#0f172a;
+    border-bottom:1px solid #1f2937;
+}
+
+.navbar h1 { font-size:18px; font-weight:600; }
+.status { font-size:12px; color:#22c55e; }
+
+/* COMMAND BAR */
+.command {
+    display:flex;
+    gap:10px;
+    padding:15px 25px;
+}
+
+.command input {
+    flex:1;
+    padding:12px;
+    border-radius:8px;
+    border:none;
+    background:#1f2937;
+    color:white;
+}
+
+.command button {
+    background:#6366f1;
+    border:none;
+    padding:12px 18px;
+    border-radius:8px;
+    color:white;
+    cursor:pointer;
+}
+
+.command button:hover { background:#4f46e5; }
+
+/* GRID */
+.grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+    padding:15px 25px;
+}
+
+/* PANELS */
+.panel {
+    background:#0f172a;
+    border-radius:10px;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+}
+
+.panel h3 {
+    font-size:13px;
+    color:#9ca3af;
+    margin-bottom:8px;
+}
+
+/* TEXT AREAS */
+textarea {
+    flex:1;
+    background:#020617;
+    color:#22c55e;
+    border:none;
+    padding:10px;
+    border-radius:6px;
+    resize:none;
+    font-family:monospace;
+}
+
+/* SERIAL FULL WIDTH */
+.serial { grid-column:span 2; }
+
+/* FOOTER */
+.footer {
+    padding:10px 25px;
+    font-size:12px;
+    color:#6b7280;
+    border-top:1px solid #1f2937;
+}
+</style>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar">
+    <h1>🤖 ESP32 AI Studio</h1>
+    <div class="status">● Device Connected</div>
+</div>
+
+<!-- COMMAND -->
+<div class="command">
+    <input id="cmd" placeholder="Enter command (e.g. Blink LED on pin 2)">
+    <button onclick="run()">Run</button>
+</div>
+
+<!-- MAIN GRID -->
+<div class="grid">
+
+    <!-- ✅ MONACO EDITOR HERE -->
+    <div class="panel">
+        <h3>🧠 Generated Firmware</h3>
+        <div id="editor" style="height:400px;"></div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="panel">
+        <h3>⚙️ Build & Execution Logs</h3>
+        <textarea id="logs"></textarea>
+    </div>
+
+    <!-- ✅ SERIAL OUTPUT (FIXED) -->
+    <div class="panel serial">
+        <h3>📡 Live Serial Console</h3>
+        <textarea id="serial"></textarea>
+    </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+    AI Embedded Development Environment • Local Runtime • Ollama Powered
+</div>
+
+<!-- 🔥 MONACO LOADER FIRST (IMPORTANT) -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+
+<script>
+let editor;
+
+// ✅ INIT MONACO AFTER LOADER
+require.config({
+    paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" }
+});
+
+require(["vs/editor/editor.main"], function () {
+    editor = monaco.editor.create(document.getElementById("editor"), {
+        value: "// AI generated code will appear here",
+        language: "cpp",
+        theme: "vs-dark",
+        automaticLayout: true,
+        fontSize: 14,
+        minimap: { enabled: false }
+    });
+});
+</script>
+
+<!-- SOCKET -->
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+
+<script>
+const socket = io();
+
+async function run(){
+    let cmd = document.getElementById("cmd").value;
+
+    if(!cmd){
+        alert("Enter a command!");
+        return;
+    }
+
+    let logs = document.getElementById("logs");
+
+    logs.value = "⚙️ Running...\n";
+
+    let res = await fetch("/run", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({command:cmd})
+    });
+
+    let data = await res.json();
+
+    logs.value = (data.logs || []).join("\n");
+
+    // ✅ PUT CODE INTO MONACO
+    if(data.code && editor){
+        editor.setValue(data.code);
+    }
+}
+
+// ✅ LIVE SERIAL WORKING NOW
+socket.on("serial", function(msg){
+    let serialBox = document.getElementById("serial");
+    serialBox.value += msg.data + "\n";
+    serialBox.scrollTop = serialBox.scrollHeight;
+});
+</script>
+
+</body>
+</html>
